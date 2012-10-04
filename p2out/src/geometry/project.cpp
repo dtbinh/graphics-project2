@@ -82,26 +82,7 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
 	heEdge* curEdge;
 	heEdge* tmpEdge;
 
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
-	glEnable(GL_LIGHT1);
-	glEnable(GL_NORMALIZE);
-
-	GLfloat light0_position[] = { 2.0, 2.0, 0.0, 1.0 };
-	GLfloat light1_position[] = { -10.0, -15.0, 10.0, 1.0 };
-	GLfloat lmodel_ambient[] = { 0.5, 0.5, 0.5, 1.0 };
-
-
-
-    glClearColor (0.0, 0.0, 0.0, 0.0);
-   	glShadeModel (GL_SMOOTH);
-   
-	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
- 	glLightfv(GL_LIGHT0, GL_POSITION, light0_position);
-	 glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
-
-	 hasTexture = false;
+		 hasTexture = false;
 
 	 if(texture_filename != NULL){
 		 printf("FOUND FILENAME %s\n",texture_filename);
@@ -124,6 +105,33 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
                 texture);
 		 }
 	 }
+
+	GLfloat light0_position[] = { 2.0, 2.0, 0.0, 1.0 };
+	GLfloat light1_position[] = { -2.0, 2.0, 0.0, 1.0 };
+	GLfloat lmodel_ambient[] = { 0.7, 0.7, 0.7, 1.0 };
+	GLfloat specular[] = {1.0f, 1.0f, 1.0f , 1.0f};
+	GLfloat ambient[] = { 1.0f, 1.0f, 1.0f };
+
+
+
+    glClearColor (0.0, 0.0, 0.0, 0.0);
+   	glShadeModel (GL_SMOOTH);
+   
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
+	glEnable(GL_LIGHTING);
+ 	glLightfv(GL_LIGHT0, GL_POSITION, light0_position);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glEnable(GL_LIGHT0);
+	glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_LIGHT1);
+	glEnable(GL_NORMALIZE);
+
+
+
+
 
 
 	//
@@ -217,6 +225,9 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
 void GeometryProject::destroy()
 {
   free(faceList);
+  if(hasTexture){
+	free(texture);
+  }
 }
 
 void GeometryProject::myDraw(){
@@ -225,7 +236,10 @@ void GeometryProject::myDraw(){
 	Vector2 curTexture;
 	int i, indA, indB, indC, numFaces;
 
-	glEnable(GL_TEXTURE_2D);
+	if(hasTexture){
+		glEnable(GL_TEXTURE_2D);
+	}
+
 	glBegin( GL_TRIANGLES); 
 
 	for(i=0;i<this->numFaces;i++){
@@ -260,7 +274,10 @@ void GeometryProject::myDraw(){
 
 	
 	glEnd(); 
-	glDisable(GL_TEXTURE_2D);
+	if(hasTexture){
+		glDisable(GL_TEXTURE_2D);
+	}
+
 	glFlush();
 }
 
@@ -276,6 +293,10 @@ void GeometryProject::render( const Camera* camera )
 {
 
 	Vector3 vPos, vAt, vCen, vUp;
+	float ambient[] = { 0.0215,  0.1745,   0.0215,  1.0};
+	float diffuse[] = { 0.07568, 0.61424,  0.07568, 1.0};
+	float specular[] = {  0.633,   0.727811, 0.633,   1.0};
+	float shininess[] = {76.8};
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode( GL_PROJECTION ); // set current matrix 
@@ -291,7 +312,15 @@ void GeometryProject::render( const Camera* camera )
 
     glMatrixMode(GL_MODELVIEW);
    	glLoadIdentity();
+	glPushMatrix();
+	if(!hasTexture){
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
+	}
 	myDraw();
+	glPopMatrix();
 
 
   	
