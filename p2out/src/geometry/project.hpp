@@ -48,6 +48,13 @@ struct MeshData
     size_t num_triangles;
 };
 
+struct nvtPair
+{
+	Vector3 vertex;
+	Vector3 normal;
+	Vector2 texture;
+};
+
 // struct for half edge data structure edges
 struct heEdge
 {
@@ -61,6 +68,8 @@ struct heEdge
 struct heVertex
 {
 	Vector3 point;
+	Vector3 normal;
+	Vector2 texture;
 	heEdge* edge;
 };
 
@@ -93,11 +102,14 @@ public:
 	void checkMatch(heEdge* edge1, heEdge* edge2);
 	void findMatches(heEdge* curEdge, heEdge* compEdge);
 	void myDraw();
-	Vector3 splitInteriorEdge(heEdge* edge);
-	Vector3 computeEvenVertex(heEdge* startEdge);
+	Vector3 round(Vector3 vector);
+	nvtPair splitInteriorEdge(heEdge* edge);
+	nvtPair splitBoundaryEdge(heEdge* edge);
+	nvtPair computeEvenInteriorVertex(heEdge* startEdge);
+	nvtPair computeEvenBoundaryVertex(heEdge* startEdge);
 	void freeFaceList(heFace* faceList);
-	void createFace(heFace* tmpFaceList, Vector3 a, Vector3 b, Vector3 c);
-	void updateFaceList(heFace* tmpFaceList, int i, Vector3 aPrime, Vector3 bPrime, Vector3 cPrime, Vector3 ab, Vector3 bc, Vector3 ca);
+	void createFace(heFace* tmpFaceList, nvtPair a, nvtPair b, nvtPair c);
+	void updateFaceList(heFace* tmpFaceList, int i, nvtPair aPrime, nvtPair bPrime, nvtPair cPrime, nvtPair ab, nvtPair bc, nvtPair ca);
 
 
 private:
@@ -114,6 +126,9 @@ private:
 	heFace* faceList;
 	int count;
 	int numFaces;
+	unsigned char* texture;
+	bool hasTexture;
+	unsigned int hTex;
 };
 
 } /* _462 */

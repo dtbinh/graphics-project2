@@ -8,6 +8,7 @@
 
 #include "geometry/project.hpp"
 #include "application/opengl.hpp"
+#include "application/imageio.hpp"
 
 /*
    A namespace declaration. All project files use this namespace.
@@ -81,8 +82,15 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
 	heEdge* curEdge;
 	heEdge* tmpEdge;
 
-	GLfloat light_position[] = { 10.0, 7.0, 15.0, 1.0 };
-	GLfloat lmodel_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHT1);
+	glEnable(GL_NORMALIZE);
+
+	GLfloat light0_position[] = { 2.0, 2.0, 0.0, 1.0 };
+	GLfloat light1_position[] = { -10.0, -15.0, 10.0, 1.0 };
+	GLfloat lmodel_ambient[] = { 0.5, 0.5, 0.5, 1.0 };
 
 
 
@@ -90,12 +98,33 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
    	glShadeModel (GL_SMOOTH);
    
 	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lmodel_ambient);
- 	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+ 	glLightfv(GL_LIGHT0, GL_POSITION, light0_position);
+	 glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
 
+	 hasTexture = false;
 
-   	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
-	glEnable(GL_DEPTH_TEST);
+	 if(texture_filename != NULL){
+		 printf("FOUND FILENAME %s\n",texture_filename);
+		 int height;
+		 int width;
+		 texture = _462::imageio_load_image(texture_filename,&width,&height);
+		 if((width != -1) && (height != -1)){
+			 printf("Loaded Image!\n");
+			 hasTexture = true;
+			 glGenTextures(1,&hTex);
+			 glBindTexture(GL_TEXTURE_2D, hTex);
+			 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
+                   GL_NEAREST);
+			 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+                   GL_NEAREST);
+			 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, 
+                height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+                texture);
+		 }
+	 }
+
 
 	//
 	//load our half edge data structure from mesh
@@ -120,6 +149,18 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
 		vertA->point = this->mesh.vertices[indA].position;
 		vertB->point = this->mesh.vertices[indB].position;
 		vertC->point = this->mesh.vertices[indC].position;
+
+		//copy normal
+		vertA->normal = this->mesh.vertices[indA].normal;
+		vertB->normal = this->mesh.vertices[indB].normal;
+		vertC->normal = this->mesh.vertices[indC].normal;
+		
+		if(hasTexture){
+		//copy texture
+			vertA->texture = this->mesh.vertices[indA].texture_coord;
+			vertB->texture = this->mesh.vertices[indB].texture_coord;
+			vertC->texture = this->mesh.vertices[indC].texture_coord;
+		}
 
 		//malloc edges
 		heEdge* eAB = (heEdge*) malloc(sizeof(heEdge));
@@ -148,6 +189,11 @@ bool GeometryProject::initialize( const Camera* camera, const MeshData* mesh, co
 		eAB->leftFace = &faceList[i];
 		eBC->leftFace = &faceList[i];
 		eCA->leftFace = &faceList[i];
+
+		//set edge pairs to null
+		eAB->pairEdge = NULL;
+		eBC->pairEdge = NULL;
+		eCA->pairEdge = NULL;
 	}
 
 	//find paired edges
@@ -175,25 +221,46 @@ void GeometryProject::destroy()
 
 void GeometryProject::myDraw(){
 
-	Vector3 normA, normB, normC, vertA, vertB, vertC;
+	Vector3 curVertex, curNormal;
+	Vector2 curTexture;
 	int i, indA, indB, indC, numFaces;
 
-	glBegin( GL_LINE_STRIP); 
+	glEnable(GL_TEXTURE_2D);
+	glBegin( GL_TRIANGLES); 
 
 	for(i=0;i<this->numFaces;i++){
 		heEdge* curEdge = faceList[i].edge;
-		Vector3 curVertex = curEdge->startVertex->point;
+		curVertex = curEdge->startVertex->point;
+		curNormal = curEdge->startVertex->normal;
+		if(hasTexture){
+			curTexture = curEdge->startVertex->texture;
+			glTexCoord2f(curTexture.x,curTexture.y);
+		}
+		glNormal3f( curNormal.x, curNormal.y, curNormal.z);
 		glVertex3f( curVertex.x, curVertex.y, curVertex.z );
 		curEdge = curEdge->nextEdge;
 		curVertex = curEdge->startVertex->point;
+		curNormal = curEdge->startVertex->normal;
+		if(hasTexture){
+			curTexture = curEdge->startVertex->texture;
+			glTexCoord2f(curTexture.x,curTexture.y);
+		}
+		glNormal3f( curNormal.x, curNormal.y, curNormal.z);
 		glVertex3f( curVertex.x, curVertex.y, curVertex.z );
 		curEdge = curEdge->nextEdge;
 		curVertex = curEdge->startVertex->point;
+		curNormal = curEdge->startVertex->normal;
+		if(hasTexture){
+			curTexture = curEdge->startVertex->texture;
+			glTexCoord2f(curTexture.x,curTexture.y);
+		}
+		glNormal3f( curNormal.x, curNormal.y, curNormal.z);
 		glVertex3f( curVertex.x, curVertex.y, curVertex.z );
 	}
 
 	
 	glEnd(); 
+	glDisable(GL_TEXTURE_2D);
 	glFlush();
 }
 
@@ -238,8 +305,11 @@ void GeometryProject::subdivide()
 {
 	int i,j;
 	heEdge* curEdge;
-	Vector3 ab, bc, ca, aPrime, bPrime, cPrime;
+	heEdge* tempEdge;
+	heEdge* compEdge;
 	heFace* tmpFaceList = (heFace*) malloc(sizeof(heFace) * 4* numFaces);
+	nvtPair ab, bc, ca, aPrime, bPrime, cPrime;
+
 	for(i=0; i<numFaces; i++){
 		//
 		//calculate odd vertices
@@ -247,27 +317,69 @@ void GeometryProject::subdivide()
 
 		curEdge = faceList[i].edge;
 		if(curEdge->pairEdge != NULL){
+			// if we have an interior edge, simply split
 			ab = splitInteriorEdge(curEdge);
-			aPrime = computeEvenVertex(curEdge);
+			tempEdge = curEdge->pairEdge->nextEdge;
+			//check if our startVertex is at a boundary
+			while(tempEdge->pairEdge != NULL){
+				// if we return to our starting place, not a boundary
+				if(tempEdge == curEdge){
+					aPrime = computeEvenInteriorVertex(curEdge);
+					break;
+				}
+				tempEdge = tempEdge->pairEdge->nextEdge;
+			}
+			if(tempEdge->pairEdge == NULL){
+			aPrime = computeEvenBoundaryVertex(tempEdge);
+			}
 		}
 		else{
-			printf("FOUND A BOUNDARY VERTEX!!\n");
+			ab = splitBoundaryEdge(curEdge);
+			aPrime = computeEvenBoundaryVertex(curEdge);
 		}
 		curEdge = curEdge->nextEdge;
-		if(curEdge->pairEdge != NULL){
+			if(curEdge->pairEdge != NULL){
+			// if we have an interior edge, simply split
 			bc = splitInteriorEdge(curEdge);
-			bPrime = computeEvenVertex(curEdge);
+			tempEdge = curEdge->pairEdge->nextEdge;
+			//check if our startVertex is at a boundary
+			while(tempEdge->pairEdge != NULL){
+				// if we return to our starting place, not a boundary
+				if(tempEdge == curEdge){
+					bPrime = computeEvenInteriorVertex(curEdge);
+					break;
+				}
+				tempEdge = tempEdge->pairEdge->nextEdge;
+			}
+			if(tempEdge->pairEdge == NULL){
+			bPrime = computeEvenBoundaryVertex(tempEdge);
+			}
 		}
 		else{
-			printf("FOUND A BOUNDARY VERTEX!!\n");
+			bc = splitBoundaryEdge(curEdge);
+			bPrime = computeEvenBoundaryVertex(curEdge);
 		}
 		curEdge = curEdge->nextEdge;
 		if(curEdge->pairEdge != NULL){
+			// if we have an interior edge, simply split
 			ca = splitInteriorEdge(curEdge);
-			cPrime = computeEvenVertex(curEdge);
+			tempEdge = curEdge->pairEdge->nextEdge;
+			//check if our startVertex is at a boundary
+			while(tempEdge->pairEdge != NULL){
+				// if we return to our starting place, not a boundary
+				if(tempEdge == curEdge){
+					cPrime = computeEvenInteriorVertex(curEdge);
+					break;
+				}
+				tempEdge = tempEdge->pairEdge->nextEdge;
+			}
+			if(tempEdge->pairEdge == NULL){
+			cPrime = computeEvenBoundaryVertex(tempEdge);
+			}
 		}
 		else{
-			printf("FOUND A BOUNDARY VERTEX!!\n");
+			ca = splitBoundaryEdge(curEdge);
+			cPrime = computeEvenBoundaryVertex(curEdge);
 		}
 		
 		updateFaceList(tmpFaceList, i, aPrime, bPrime, cPrime, ab, bc, ca);
@@ -308,17 +420,43 @@ void GeometryProject::freeFaceList(heFace* faceList){
 
 }
 
-void GeometryProject::createFace(heFace* tmpFaceList, Vector3 a, Vector3 b, Vector3 c){
+Vector3 GeometryProject::round(Vector3 vector){
+
+	Vector3 rounded;
+
+	rounded.x = ceil(vector.x * 10000.0) / 10000.0;
+	rounded.y = ceil(vector.y * 10000.0) / 10000.0;
+	rounded.z = ceil(vector.z * 10000.0) / 10000.0;
+
+	return rounded;
+
+}
+
+void GeometryProject::createFace(heFace* tmpFaceList, nvtPair a, nvtPair b, nvtPair c){
 
 	//malloc vertices
 	heVertex* vertA = (heVertex*) malloc(sizeof(heVertex));
 	heVertex* vertB = (heVertex*) malloc(sizeof(heVertex));
 	heVertex* vertC = (heVertex*) malloc(sizeof(heVertex));
 
-	//copy position
-	vertA->point = a;
-	vertB->point = b;
-	vertC->point = c;
+	//copy position with slight rounding
+	// otherwise paired edges are slightly off
+	// and holes open up in the surface
+	vertA->point = round(a.vertex);
+	vertB->point = round(b.vertex);
+	vertC->point = round(c.vertex);
+
+	//copy normal
+	vertA->normal = a.normal;
+	vertB->normal = b.normal;
+	vertC->normal = c.normal;
+
+	//copy textures
+	if(hasTexture){
+		vertA->texture = a.texture;
+		vertB->texture = b.texture;
+		vertC->texture = c.texture;
+	}
 
 	//malloc edges
 	heEdge* eAB = (heEdge*) malloc(sizeof(heEdge));
@@ -348,9 +486,19 @@ void GeometryProject::createFace(heFace* tmpFaceList, Vector3 a, Vector3 b, Vect
 	eBC->leftFace = tmpFaceList;
 	eCA->leftFace = tmpFaceList;
 
+	//set edge pairs to null
+	eAB->pairEdge = NULL;
+	eBC->pairEdge = NULL;
+	eCA->pairEdge = NULL;
+
 }
 
-void GeometryProject::updateFaceList(heFace* tmpFaceList, int i, Vector3 aPrime, Vector3 bPrime, Vector3 cPrime, Vector3 ab, Vector3 bc, Vector3 ca){
+void GeometryProject::updateFaceList(heFace* tmpFaceList, int i, nvtPair aPrime, nvtPair bPrime, nvtPair cPrime, nvtPair ab, nvtPair bc, nvtPair ca){
+
+	/*createFace(&tmpFaceList[4*i], ca, aPrime, ab);
+	createFace(&tmpFaceList[4*i + 1], ca, bc, cPrime);
+	createFace(&tmpFaceList[4*i + 2], ca, ab, bc);
+	createFace(&tmpFaceList[4*i + 3], ab, bPrime, bc);*/
 
 	createFace(&tmpFaceList[4*i], aPrime, ab, ca);
 	createFace(&tmpFaceList[4*i + 1], ca, bc, cPrime);
@@ -359,71 +507,214 @@ void GeometryProject::updateFaceList(heFace* tmpFaceList, int i, Vector3 aPrime,
 
 }
 
-Vector3 GeometryProject::computeEvenVertex(heEdge* startEdge){
+nvtPair GeometryProject::computeEvenBoundaryVertex(heEdge* startEdge){
+
+	Vector3 a,b,newVertex, aNorm, bNorm, newNormVertex;
+	Vector2 aTex, bTex, newTex;
+	heEdge* temp;
+	nvtPair result;
+
+	a = startEdge->nextEdge->startVertex->point;
+	aNorm = startEdge->nextEdge->startVertex->normal;
+	if(hasTexture){
+		aTex = startEdge->nextEdge->startVertex->texture;
+	}
+	temp = startEdge->nextEdge->nextEdge;
+	while(temp->pairEdge != NULL){
+		temp = temp->pairEdge->nextEdge->nextEdge;
+	}
+	b = temp->startVertex->point;
+	bNorm = temp->startVertex->normal;
+	if(hasTexture){
+		bTex = temp->startVertex->texture;
+	}
+
+	newVertex = startEdge->startVertex->point;
+	newVertex = 3.0 * newVertex / 4.0;
+	a = 1.0 * a / 8.0;
+	b = 1.0 * b / 8.0;
+	newVertex = newVertex + a + b;
+	
+	newNormVertex = startEdge->startVertex->normal;
+	newNormVertex = 3.0 * newNormVertex / 4.0;
+	aNorm = 1.0 * aNorm / 8.0;
+	bNorm = 1.0 * bNorm / 8.0;
+	newNormVertex = newNormVertex + aNorm + bNorm;
+
+	if(hasTexture){
+		newTex = startEdge->startVertex->texture;
+		newTex = 3.0 * newTex / 4.0;
+		aTex = 1.0 * aTex / 8.0;
+		bTex = 1.0 * bTex / 8.0;
+		newTex = aTex + bTex + newTex;
+		result.texture = newTex;
+	}
+
+	result.normal = newNormVertex;
+	result.vertex = newVertex;
+	
+	return result;
+}
+
+nvtPair GeometryProject::computeEvenInteriorVertex(heEdge* startEdge){
 	int numNeighbors = 0;
 	Vector3 neighbors = Vector3::Zero; 
+	Vector3 normNeighbors = Vector3::Zero;
+	Vector2 newTex = Vector2::Zero;
 	float math = 0;
+	float normMath = 0;
+	float texMath = 0;
 	float pi = std::atan(1.0) * 4;
 	heEdge* curEdge;
-	//
-	//calculate even vertices
-	//
+	nvtPair result;
 
 	//sum neighbors
 	curEdge = startEdge->nextEdge;
 	neighbors += curEdge->startVertex->point;
+	normNeighbors += curEdge->startVertex->normal;
+	if(hasTexture){
+		newTex += curEdge->startVertex->texture;
+	}
 	numNeighbors++;
 	curEdge = curEdge->nextEdge;
 	neighbors += curEdge->startVertex->point;
+	normNeighbors += curEdge->startVertex->normal;
+	if(hasTexture){
+		newTex += curEdge->startVertex->texture;
+	}
 	numNeighbors++;
-	if(curEdge->pairEdge != NULL){
-		curEdge = curEdge->pairEdge->nextEdge->nextEdge;
+	curEdge = curEdge->pairEdge->nextEdge->nextEdge;
+
 		while(curEdge->nextEdge->startVertex->point.operator ==(startEdge->startVertex->point)){
-			if(curEdge->pairEdge != NULL){
-				if(curEdge->pairEdge != startEdge){
-					neighbors += curEdge->startVertex->point;
-					numNeighbors++;
-					curEdge = curEdge->pairEdge->nextEdge->nextEdge;
+			if(curEdge->pairEdge != startEdge){
+				neighbors += curEdge->startVertex->point;
+				normNeighbors += curEdge->startVertex->normal;
+				if(hasTexture){
+					newTex += curEdge->startVertex->texture;
 				}
-				else{
-					break;
-				}
+				numNeighbors++;
+				curEdge = curEdge->pairEdge->nextEdge->nextEdge;
 			}
 			else{
-				neighbors += curEdge->startVertex->point;
-				numNeighbors++;
 				break;
 			}
 		}
-	}
+	
 	math = cos(2 * pi / numNeighbors);
-	math/=4;
+	math/=4.0;
 	math+=3.0/8.0;
 	math = (5.0/8.0) - pow(math,2);
 	math/=numNeighbors;
+	normMath = math;
+	if(hasTexture){
+		texMath = math;
+	}
 	neighbors*=math;
+	normNeighbors*=normMath;
 	math*=numNeighbors;
+	normMath*=numNeighbors;
 	math = 1.0 - math;
+	normMath = 1.0 - normMath;
 	neighbors+=math * startEdge->startVertex->point;
-	return neighbors;
+	normNeighbors+=normMath * startEdge->startVertex->normal;
+
+	if(hasTexture){
+		newTex*=texMath;
+		texMath*=numNeighbors;
+		texMath = 1.0 - texMath;
+		newTex+=texMath * startEdge->startVertex->texture;
+		result.texture = newTex;
+	}
+
+	result.normal = normNeighbors;
+	result.vertex = neighbors;
+
+	return result;
 }
 
-Vector3 GeometryProject::splitInteriorEdge(heEdge* edge){
-	Vector3 a,b,c,d,newVertex;
+nvtPair GeometryProject::splitBoundaryEdge(heEdge* edge){
+	Vector3 a,b,newVertex, aNorm, bNorm, newNormVertex;
+	Vector2 newTex, aTex, bTex;
+	nvtPair result;
+
+	a = edge->startVertex->point;
+	b = edge->nextEdge->startVertex->point;
+
+	aNorm = edge->startVertex->normal;
+	bNorm = edge->nextEdge->startVertex->normal;
+
+	a = 1.0 * a / 2.0;
+	b = 1.0 * b / 2.0;
+
+	aNorm = 1.0 * aNorm / 2.0;
+	bNorm = 1.0 * bNorm / 2.0;
+
+	newVertex = a + b;
+	newNormVertex = aNorm + bNorm;
+
+	if(hasTexture){
+		aTex = edge->startVertex->texture;
+		bTex = edge->startVertex->texture;
+		aTex = 1.0 * aTex / 2.0;
+		bTex = 1.0 * bTex / 2.0;
+		newTex = aTex + bTex;
+		result.texture = newTex;
+	}
+
+	result.vertex = newVertex;
+	result.normal = newNormVertex;
+
+	return result;
+
+}
+
+nvtPair GeometryProject::splitInteriorEdge(heEdge* edge){
+	Vector3 a,b,c,d,newVertex, aNorm, bNorm, cNorm, dNorm, newNormVertex;
+	Vector2 aTex, bTex, cTex, dTex, newTex;
+	nvtPair result;
 
 	a = edge->startVertex->point;
 	b = edge->nextEdge->startVertex->point;
 	c = edge->nextEdge->nextEdge->startVertex->point;
 	d = edge->pairEdge->nextEdge->nextEdge->startVertex->point;
 
-	a = 3 * a / 8;
-	b = 3 * b / 8;
-	c = c / 8;
-	d = d / 8;
+	aNorm = edge->startVertex->normal;
+	bNorm = edge->nextEdge->startVertex->normal;
+	cNorm = edge->nextEdge->nextEdge->startVertex->normal;
+	dNorm = edge->pairEdge->nextEdge->nextEdge->startVertex->normal;
+
+	a = 3.0 * a / 8.0;
+	b = 3.0 * b / 8.0;
+	c = 1.0 * c / 8.0;
+	d = 1.0 * d / 8.0;
+	
+	aNorm = 3.0 * aNorm / 8.0;
+	bNorm = 3.0 * bNorm / 8.0;
+	cNorm = 1.0 * cNorm / 8.0;
+	dNorm = 1.0 * dNorm / 8.0;
+
+	if(hasTexture){
+		aTex = edge->startVertex->texture;
+		bTex = edge->nextEdge->startVertex->texture;
+		cTex = edge->nextEdge->nextEdge->startVertex->texture;
+		dTex = edge->pairEdge->nextEdge->nextEdge->startVertex->texture;
+
+		aTex = 3.0 * aTex / 8.0;
+		bTex = 3.0 * bTex / 8.0;
+		cTex = 1.0 * cTex / 8.0;
+		dTex = 1.0 * dTex / 8.0;
+
+		newTex = aTex + bTex + cTex + dTex;
+		result.texture = newTex;
+	}
 
 	newVertex = a + b + c + d;
+	newNormVertex = aNorm + bNorm + cNorm + dNorm;
 
-	return newVertex;
+	result.normal = newNormVertex;
+	result.vertex = newVertex;
+
+	return result;
 }
 
 
